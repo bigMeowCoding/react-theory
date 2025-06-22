@@ -1,16 +1,16 @@
 const effectStack = [];
 
-const cleanup = (effect, callback) => {
-  effect.deps.forEach((dep) => {
-    dep.delete(callback);
+function clearDependencies(effect) {
+  effect.dependencies.forEach((subs) => {
+    subs.delete(effect);
   });
-  effect.deps.clear();
-};
+  effect.dependencies.clear();
+}
 
-export const useEffect = (callback) => {
+export function useEffect(callback) {
   const execute = () => {
+    clearDependencies(effect);
     effectStack.push(effect);
-    cleanup(effect, callback);
     try {
       callback();
     } finally {
@@ -18,62 +18,38 @@ export const useEffect = (callback) => {
     }
   };
   const effect = {
+    dependencies: new Set(),
     execute,
-    deps: new Set(),
   };
-  execute();
-};
 
-export const useState = (initialValue) => {
+  effect.execute();
+}
+
+function subscribe(effect, subs) {
+  subs.add(effect);
+  effect.dependencies.add(subs);
+}
+
+export function useState(initialValue) {
   const subs = new Set();
-
-  const get = () => {
+  function getValue() {
     const effect = effectStack[effectStack.length - 1];
-    if (effect) {
-      subscribe(subs, effect);
-    }
+    effect && subscribe(effect, subs);
     return initialValue;
-  };
-  const set = (value) => {
+  }
+  function setValue(value) {
     initialValue = value;
-
     for (const sub of [...subs]) {
       sub.execute();
     }
-  };
-  const subscribe = (subs, effect) => {
-    subs.add(effect);
-    effect.deps.add(subs);
-  };
+  }
+  return [getValue, setValue];
+}
 
-  return [get, set];
-};
-
-export const useMemo = (callback) => {
-  const [state, setState] = useState();
+export function useMemo(callback) {
+  const [value, setValue] = useState(null);
   useEffect(() => {
-    setState(callback());
+    setValue(callback());
   });
-  return state;
-};
-
-// const [name1, setName1] = useState('tome');
-// const [name2, setName2] = useState('jerry');
-// const [showAll, setShowAll] = useState(false);
-
-// const whoIsHere = useMemo(() => {
-//   if (!showAll()) {
-//     return name1();
-//   }
-//   return name1() + name2();
-// });
-
-// useEffect(() => {
-//   console.log(whoIsHere());
-// });
-
-// setName1('tom');
-// // console.log(whoIsHere());
-
-// setShowAll(true);
-// // console.log(whoIsHere());
+  return value;
+}
