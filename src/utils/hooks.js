@@ -1,83 +1,79 @@
 const effectStack = [];
 
-function cleanupEffect(effect) {
-  if (effect.deps) {
-    for (const subs of effect.deps) {
-      subs.delete(effect);
-    }
-    effect.deps.clear();
-  }
-}
-
-function subscribe(effect, subs) {
-  subs.add(effect);
-  effect.deps.add(subs);
-}
+const cleanup = (effect, callback) => {
+  effect.deps.forEach((dep) => {
+    dep.delete(callback);
+  });
+  effect.deps.clear();
+};
 
 export const useEffect = (callback) => {
   const execute = () => {
-    cleanupEffect(effect);
     effectStack.push(effect);
+    cleanup(effect, callback);
     try {
       callback();
     } finally {
       effectStack.pop();
     }
   };
-
   const effect = {
     execute,
     deps: new Set(),
   };
-
   execute();
 };
 
 export const useState = (initialValue) => {
   const subs = new Set();
-  let value = initialValue;
-  const getValue = () => {
+
+  const get = () => {
     const effect = effectStack[effectStack.length - 1];
     if (effect) {
-      subscribe(effect, subs);
+      subscribe(subs, effect);
     }
-    return value;
+    return initialValue;
   };
-  const setValue = (newValue) => {
-    value = newValue;
+  const set = (value) => {
+    initialValue = value;
 
-    for (const effect of [...subs]) {
-      effect.execute();
+    for (const sub of [...subs]) {
+      sub.execute();
     }
   };
-  return [getValue, setValue];
+  const subscribe = (subs, effect) => {
+    subs.add(effect);
+    effect.deps.add(subs);
+  };
+
+  return [get, set];
 };
 
 export const useMemo = (callback) => {
-  const [value, setValue] = useState();
+  const [state, setState] = useState();
   useEffect(() => {
-    setValue(callback());
+    setState(callback());
   });
-  return value;
+  return state;
 };
 
-const [name1, setName1] = useState("name1");
-const [name2, setName2] = useState("name2");
-const [showAll, setShowAll] = useState(true);
-  const whoIsHere = useMemo(() => {
-    if (!showAll()) {
-      return name1();
-    } else {
-      return `${name1()} and ${name2()}`;
-    }
-  });
+// const [name1, setName1] = useState('tome');
+// const [name2, setName2] = useState('jerry');
+// const [showAll, setShowAll] = useState(false);
 
-useEffect(() => {
-  console.log("whoIsHere", whoIsHere());
-});
+// const whoIsHere = useMemo(() => {
+//   if (!showAll()) {
+//     return name1();
+//   }
+//   return name1() + name2();
+// });
 
-setName1("lily");
-setShowAll(false);
-console.log("setShowAllfalse",);
-setName2("lucy");
-setName1('tome===')
+// useEffect(() => {
+//   console.log(whoIsHere());
+// });
+
+// setName1('tom');
+// // console.log(whoIsHere());
+
+// setShowAll(true);
+// // console.log(whoIsHere());
